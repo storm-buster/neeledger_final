@@ -1,0 +1,109 @@
+import { ethers } from "hardhat";
+import fs from "fs";
+import path from "path";
+
+async function main() {
+  console.log("🚀 Starting Carbon Credit Blockchain System deployment...\n");
+
+  const [deployer] = await ethers.getSigners();
+  console.log("👤 Deploying contracts with account:", deployer.address);
+  console.log("💰 Account balance:", (await deployer.provider.getBalance(deployer.address)).toString(), "\n");
+
+  // Deploy CarbonRegistry
+  console.log("📜 Deploying CarbonRegistry...");
+  const CarbonRegistry = await ethers.getContractFactory("CarbonRegistry");
+  const registry = await CarbonRegistry.deploy();
+  await registry.waitForDeployment();
+  const registryAddress = await registry.getAddress();
+  console.log("✅ CarbonRegistry deployed to:", registryAddress);
+
+  // Deploy MerkleTreeUtils
+  console.log("\n📜 Deploying MerkleTreeUtils...");
+  const MerkleTreeUtils = await ethers.getContractFactory("MerkleTreeUtils");
+  const merkleUtils = await MerkleTreeUtils.deploy();
+  await merkleUtils.waitForDeployment();
+  const merkleUtilsAddress = await merkleUtils.getAddress();
+  console.log("✅ MerkleTreeUtils deployed to:", merkleUtilsAddress);
+
+  // Deploy OracleConsumer
+  console.log("\n📜 Deploying OracleConsumer...");
+  const OracleConsumer = await ethers.getContractFactory("OracleConsumer");
+  const oracle = await OracleConsumer.deploy();
+  await oracle.waitForDeployment();
+  const oracleAddress = await oracle.getAddress();
+  console.log("✅ OracleConsumer deployed to:", oracleAddress);
+
+  // Deploy MultiSigWallet
+  console.log("\n📜 Deploying MultiSigWallet...");
+  const MultiSigWallet = await ethers.getContractFactory("MultiSigWallet");
+  const multiSig = await MultiSigWallet.deploy(
+    deployer.address, // verifier
+    deployer.address, // admin
+    deployer.address  // oracle
+  );
+  await multiSig.waitForDeployment();
+  const multiSigAddress = await multiSig.getAddress();
+  console.log("✅ MultiSigWallet deployed to:", multiSigAddress);
+
+  // Deploy CarbonCreditToken
+  console.log("\n📜 Deploying CarbonCreditToken...");
+  const CarbonCreditToken = await ethers.getContractFactory("CarbonCreditToken");
+  const token = await CarbonCreditToken.deploy(registryAddress);
+  await token.waitForDeployment();
+  const tokenAddress = await token.getAddress();
+  console.log("✅ CarbonCreditToken deployed to:", tokenAddress);
+
+  // Setup contracts
+  console.log("\n⚙️  Setting up contracts...");
+
+  // Approve verifier in registry
+  console.log("   → Approving verifier...");
+  await registry.approveVerifier(deployer.address, true);
+
+  // Save deployment addresses
+  const deploymentInfo = {
+    network: (await ethers.provider.getNetwork()).name,
+    chainId: (await ethers.provider.getNetwork()).chainId.toString(),
+    deployer: deployer.address,
+    timestamp: new Date().toISOString(),
+    contracts: {
+      CarbonRegistry: registryAddress,
+      MerkleTreeUtils: merkleUtilsAddress,
+      OracleConsumer: oracleAddress,
+      MultiSigWallet: multiSigAddress,
+      CarbonCreditToken: tokenAddress,
+    },
+  };
+
+  const deploymentsDir = path.join(__dirname, "deployments");
+  if (!fs.existsSync(deploymentsDir)) {
+    fs.mkdirSync(deploymentsDir, { recursive: true });
+  }
+
+  const deploymentFile = path.join(
+    deploymentsDir,
+    `${deploymentInfo.network}-${Date.now()}.json`
+  );
+  fs.writeFileSync(deploymentFile, JSON.stringify(deploymentInfo, null, 2));
+  fs.writeFileSync(
+    path.join(deploymentsDir, "latest.json"),
+    JSON.stringify(deploymentInfo, null, 2)
+  );
+
+  console.log("\n📁 Deployment info saved to:", deploymentFile);
+  console.log("\n🎉 Deployment completed successfully!\n");
+
+  console.log("📋 Contract Addresses:");
+  console.log("   CarbonRegistry:", registryAddress);
+  console.log("   MerkleTreeUtils:", merkleUtilsAddress);
+  console.log("   OracleConsumer:", oracleAddress);
+  console.log("   MultiSigWallet:", multiSigAddress);
+  console.log("   CarbonCreditToken:", tokenAddress);
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });

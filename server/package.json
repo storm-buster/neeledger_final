@@ -1,0 +1,14 @@
+{
+  "name": "neeledger-server",
+  "version": "0.1.0",
+  "description": "Simple backend for NeeLedger - geocode proxy",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^4.22.1",
+    "node-fetch": "^2.6.7"
+  }
+}
