@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { FileText, Calendar, CheckCircle, XCircle, Clock, Eye, ArrowLeft, Shield, ArrowRight, Stamp, User, Building2 } from 'lucide-react';
+import { FileText, Calendar, CheckCircle, XCircle, Clock, Eye, ArrowLeft, Shield, ArrowRight, Stamp, User, Building2, Zap } from 'lucide-react';
 import { useDocumentActions } from '../../hooks/useDocumentActions';
 import { Upload } from 'lucide-react';
 import { Project, ACVA } from '../../types';
+import { ComparisonResultModal } from '../Common/ComparisonResultModal';
+import { grokService, GrokComparisonResult } from '../../lib/grokService';
 
 interface ValidationPageProps {
   projects: Project[];
@@ -174,6 +176,10 @@ interface ValidationDetailPageProps {
 
 function ValidationDetailPage({ project, acvas, onBack, onSanction }: ValidationDetailPageProps) {
   const [sanctioned, setSanctioned] = useState(false);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [comparisonResult, setComparisonResult] = useState<GrokComparisonResult | null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
   const { uploadingDoc, handleViewDocument, handleUploadToIPFS } = useDocumentActions();
 
   const getProjectName = (p: any) => p.name || p.metadata?.ownership || p.id;
@@ -267,6 +273,22 @@ Date: ${new Date().toLocaleDateString()}`;
   const handleSanction = () => {
     onSanction(project.id);
     setSanctioned(true);
+  };
+
+  const handleAIComparison = async () => {
+    setComparisonLoading(true);
+    setComparisonError(null);
+    try {
+      const result = await grokService.compareValidationDocuments(pddContent, acvaReportContent);
+      setComparisonResult(result);
+      setComparisonOpen(true);
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Failed to compare documents';
+      setComparisonError(errorMsg);
+      setComparisonOpen(true);
+    } finally {
+      setComparisonLoading(false);
+    }
   };
 
   return (
@@ -438,6 +460,31 @@ Date: ${new Date().toLocaleDateString()}`;
         </div>
       </div>
 
+      {/* AI Comparison Button */}
+      <div className="mb-8 flex justify-center">
+        <button
+          onClick={handleAIComparison}
+          disabled={comparisonLoading}
+          className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-white shadow-lg transition-all duration-200 ${
+            comparisonLoading
+              ? 'bg-indigo-400 cursor-wait'
+              : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 hover:shadow-xl hover:scale-[1.03]'
+          }`}
+        >
+          {comparisonLoading ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Analyzing Documents...
+            </>
+          ) : (
+            <>
+              <Zap className="w-5 h-5" />
+              🤖 AI Compare PDD vs Report
+            </>
+          )}
+        </button>
+      </div>
+
       {/* Sanction Decision Panel */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800 dark:to-gray-750 border-b border-gray-200 dark:border-gray-700">
@@ -516,6 +563,17 @@ Date: ${new Date().toLocaleDateString()}`;
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+
+      {/* AI Comparison Result Modal */}
+      <ComparisonResultModal
+        isOpen={comparisonOpen}
+        onClose={() => setComparisonOpen(false)}
+        result={comparisonResult}
+        isLoading={comparisonLoading}
+        error={comparisonError}
+        doc1Title="Project Design Document (PDD)"
+        doc2Title="ACVA Validation Report"
+      />
     </div>
   );
 }

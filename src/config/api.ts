@@ -1,20 +1,31 @@
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+// Use relative path for Vercel deployment, fallback to localhost for dev
+const getBaseUrl = (): string => {
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    return ''; // Use relative path on production (Vercel)
+  }
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+};
 
 export const apiConfig = {
-  baseURL: API_BASE_URL,
+  get baseURL() {
+    return getBaseUrl();
+  },
   endpoints: {
     geocode: '/api/geocode',
     xai: '/api/xai',
     mockmap: '/api/mockmap',
-    satellites: '/api/satellites'
+    satellites: '/api/satellites',
+    grokCompare: '/api/grok-compare'
   }
 };
 
 // API Client helper
 export const apiClient = {
   get: async (endpoint: string, params?: Record<string, string>) => {
-    const url = new URL(endpoint, apiConfig.baseURL);
+    const baseUrl = apiConfig.baseURL;
+    const fullUrl = baseUrl ? `${baseUrl}${endpoint}` : endpoint;
+    const url = new URL(fullUrl, window.location.origin);
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         url.searchParams.append(key, value);
@@ -29,7 +40,9 @@ export const apiClient = {
   },
   
   post: async (endpoint: string, data?: any) => {
-    const response = await fetch(`${apiConfig.baseURL}${endpoint}`, {
+    const baseUrl = apiConfig.baseURL;
+    const fullUrl = baseUrl ? `${baseUrl}${endpoint}` : endpoint;
+    const response = await fetch(fullUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
