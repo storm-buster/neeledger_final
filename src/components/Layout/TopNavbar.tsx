@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Home, 
-  FolderOpen, 
-  UserCheck, 
-  Shield, 
-  CheckCircle, 
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  Home,
+  FolderOpen,
+  UserCheck,
+  Shield,
+  CheckCircle,
   Verified,
   Brain,
   MapPin,
@@ -15,6 +15,7 @@ import {
   Moon,
   Sun,
   X,
+  Menu,
   LogOut
 } from 'lucide-react';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -39,12 +40,29 @@ const menuItems = [
 
 export default function TopNavbar({ activeSection, onSectionChange }: TopNavbarProps) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { theme, toggleTheme } = useTheme();
   const { signOut } = useAuth();
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement | null>(null);
   const [adminOpen, setAdminOpen] = useState(false);
   const adminRef = useRef<HTMLDivElement | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close the mobile menu whenever the route changes
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  // Allow Escape to close the mobile menu
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileOpen(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [mobileOpen]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -71,22 +89,23 @@ export default function TopNavbar({ activeSection, onSectionChange }: TopNavbarP
 
   const handleSignOut = async () => {
     setAdminOpen(false);
+    setMobileOpen(false);
     await signOut();
-    navigate('/auth');
+    navigate('/login');
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-white/20 dark:border-gray-700/50 shadow-lg transition-colors overflow-visible">
+    <nav aria-label="Main navigation" className="fixed top-0 left-0 right-0 z-50 bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-white/20 dark:border-gray-700/50 shadow-lg transition-colors overflow-visible">
       <div className="max-w-[1400px] mx-auto w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20">
           {/* Logo - Modern Bubble Style */}
-          <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0 min-w-[260px]">
+          <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0 min-w-0 lg:min-w-[260px]">
             <div className="relative group">
               <div className="absolute inset-0 bg-gradient-to-r from-nee-500 to-nee-600 rounded-2xl blur-lg opacity-50 group-hover:opacity-75 transition-opacity"></div>
-              <img 
-                src="/logo.jpg" 
-                alt="NeeLedger" 
-                className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-2xl object-cover shadow-xl ring-2 ring-white/50" 
+              <img
+                src="/logo.jpg"
+                alt="NeeLedger"
+                className="relative w-10 h-10 sm:w-12 sm:h-12 rounded-2xl object-cover shadow-xl ring-2 ring-white/50"
               />
             </div>
             <div className="hidden sm:block truncate">
@@ -102,14 +121,14 @@ export default function TopNavbar({ activeSection, onSectionChange }: TopNavbarP
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeSection === item.id;
-              
+
               return (
                 <button
                   key={item.id}
                   onClick={() => handleNavigation(item)}
                   className={`group relative flex items-center gap-1 px-2 py-1 rounded-full transition-all duration-300 flex-shrink-0 whitespace-nowrap ${
-                    isActive 
-                      ? 'bg-gradient-to-r from-nee-500 to-nee-600 text-white shadow-lg shadow-nee-500/50 scale-105' 
+                    isActive
+                      ? 'bg-gradient-to-r from-nee-500 to-nee-600 text-white shadow-lg shadow-nee-500/50 scale-105'
                       : 'bg-white/60 dark:bg-gray-800/60 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800 hover:shadow-md hover:scale-105'
                   }`}
                   title={item.label}
@@ -118,12 +137,12 @@ export default function TopNavbar({ activeSection, onSectionChange }: TopNavbarP
                   {isActive && (
                     <div className="absolute inset-0 bg-gradient-to-r from-nee-400 to-nee-600 rounded-full blur-xl opacity-50 animate-pulse"></div>
                   )}
-                  
+
                   <Icon className={`relative w-4 h-4 ${isActive ? 'text-white' : 'text-gray-600 dark:text-gray-300 group-hover:text-nee-600 dark:group-hover:text-nee-400'} transition-colors`} />
                   <span className={`relative text-xs sm:text-sm font-semibold hidden xl:inline ${isActive ? 'text-white' : 'text-gray-700 dark:text-gray-200 group-hover:text-nee-600 dark:group-hover:text-nee-400'} transition-colors`}>
                     {item.label}
                   </span>
-                  
+
                   {/* Hover shine effect */}
                   <div className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 </button>
@@ -134,7 +153,7 @@ export default function TopNavbar({ activeSection, onSectionChange }: TopNavbarP
           {/* Right Side Actions - Bubble Style */}
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Dark Mode Toggle */}
-            <button 
+            <button
               onClick={toggleTheme}
               className="relative group p-2 sm:p-3 bg-white/60 dark:bg-gray-800/60 hover:bg-white dark:hover:bg-gray-800 rounded-full transition-all duration-300 hover:shadow-lg hover:scale-110"
               title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
@@ -182,11 +201,11 @@ export default function TopNavbar({ activeSection, onSectionChange }: TopNavbarP
             </div>
 
             {/* Settings */}
-            <button 
+            <button
               onClick={handleSettings}
               className={`group relative p-2 sm:p-3 rounded-full transition-all duration-300 hover:scale-110 ${
-                activeSection === 'settings' 
-                  ? 'bg-gradient-to-r from-nee-500 to-nee-600 text-white shadow-lg shadow-nee-500/50' 
+                activeSection === 'settings'
+                  ? 'bg-gradient-to-r from-nee-500 to-nee-600 text-white shadow-lg shadow-nee-500/50'
                   : 'bg-white/60 dark:bg-gray-800/60 hover:bg-white dark:hover:bg-gray-800 hover:shadow-lg'
               }`}
             >
@@ -250,9 +269,58 @@ export default function TopNavbar({ activeSection, onSectionChange }: TopNavbarP
                 </div>
               )}
             </div>
+
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setMobileOpen((s) => !s)}
+              aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={mobileOpen}
+              aria-controls="mobile-navigation"
+              className="lg:hidden group relative p-2 bg-white/60 dark:bg-gray-800/60 hover:bg-white dark:hover:bg-gray-800 rounded-full transition-all duration-300 hover:shadow-lg"
+            >
+              {mobileOpen ? (
+                <X className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-nee-600 dark:group-hover:text-nee-400 transition-colors" />
+              ) : (
+                <Menu className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-nee-600 dark:group-hover:text-nee-400 transition-colors" />
+              )}
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile navigation panel */}
+      {mobileOpen && (
+        <div
+          id="mobile-navigation"
+          className="lg:hidden absolute top-full left-0 right-0 max-h-[calc(100vh-4rem)] overflow-y-auto bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-b border-white/20 dark:border-gray-700/50 shadow-2xl"
+        >
+          <div className="max-w-[1400px] mx-auto w-full px-4 sm:px-6 py-3 grid grid-cols-2 gap-2">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeSection === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    handleNavigation(item);
+                    setMobileOpen(false);
+                  }}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                    isActive
+                      ? 'bg-gradient-to-r from-nee-500 to-nee-600 text-white shadow-lg shadow-nee-500/50'
+                      : 'bg-white/60 dark:bg-gray-800/60 text-gray-700 dark:text-gray-200 hover:bg-white dark:hover:bg-gray-800'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`} />
+                  <span className="truncate">{item.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

@@ -34,6 +34,28 @@ export interface ProjectMetadata {
   location?: string;
 }
 
+// System authorization role (Admin Panel vs User Panel access)
+export type AuthorizationRole = 'admin' | 'user';
+
+// Business account types
+export type BusinessAccountType = 'Project Developer' | 'Project Proponent' | 'Trader';
+
+// Database profile representation from public.users
+export interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  role: BusinessAccountType;
+  is_admin: boolean;
+  is_disabled?: boolean;
+  wallet_address?: string;
+  credits?: number;
+  kyc_status?: string;
+  kyc_document?: string;
+  member_since?: string;
+  additional_data?: Record<string, any>;
+}
+
 export interface Account {
   id: string;
   companyName: string;

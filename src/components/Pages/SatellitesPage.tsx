@@ -20,14 +20,7 @@ import {
   useToast,
   ColorBends,
 } from '@/components/ui-bits';
-
-interface Satellite {
-  id: string;
-  country: string;
-  launch_date: string;
-  mass: string;
-  launcher: string;
-}
+import { satellitesApi, CustomerSatellite as Satellite } from '../../api';
 
 export default function SatellitesPage() {
   const [sats, setSats] = useState<Satellite[]>([]);
@@ -37,23 +30,33 @@ export default function SatellitesPage() {
   const { toast } = useToast();
 
   useEffect(() => {
+    let isMounted = true;
     setLoading(true);
-    fetch('/api/satellites')
-      .then((r) => r.json())
+
+    satellitesApi
+      .getSatellites()
       .then((data) => {
-        setSats(data.customer_satellites || []);
-        setLoading(false);
+        if (isMounted) {
+          setSats(data);
+          setLoading(false);
+        }
       })
       .catch((error) => {
-        console.error('Failed to fetch satellites:', error);
-        setSats([]);
-        setLoading(false);
-        toast({
-          title: 'Error loading satellites',
-          description: 'Could not fetch satellite data. Using mock data.',
-          variant: 'error',
-        });
+        if (isMounted) {
+          console.error('Failed to fetch satellites:', error);
+          setSats([]);
+          setLoading(false);
+          toast({
+            title: 'Error loading satellites',
+            description: 'Could not fetch satellite data. Using mock data.',
+            variant: 'error',
+          });
+        }
       });
+
+    return () => {
+      isMounted = false;
+    };
   }, [toast]);
 
   // Memoize filtered results for performance

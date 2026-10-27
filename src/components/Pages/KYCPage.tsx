@@ -50,8 +50,8 @@ export default function KYCPage({ accounts }: KYCPageProps) {
   }, []);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
-  const filteredAccounts = filter === 'all' 
-    ? accounts 
+  const filteredAccounts = filter === 'all'
+    ? accounts
     : accounts.filter(account => account.kycStatus === filter);
 
   const getStatusIcon = (status: string) => {
@@ -81,19 +81,19 @@ export default function KYCPage({ accounts }: KYCPageProps) {
   };
 
   const handleApprove = (accountId: string) => {
-    console.log('Approving account:', accountId);
-    // Here you would update the account status via API
+    alert(`[Demo Mode Simulation]\n\nAccount ID: ${accountId}\nAction: Approved KYC documentation.\n\nNote: In production, this updates public.users.kyc_status with verifiable auditor signatures.`);
+    setSelectedAccount(null);
   };
 
   const handleReject = (accountId: string) => {
-    console.log('Rejecting account:', accountId);
-    // Here you would update the account status via API
+    alert(`[Demo Mode Simulation]\n\nAccount ID: ${accountId}\nAction: Rejected KYC documentation.\n\nNote: In production, this records rejection reasons and notifies the proponent.`);
+    setSelectedAccount(null);
   };
 
   if (selectedAccount) {
     return (
-      <KYCDetailModal 
-        account={selectedAccount} 
+      <KYCDetailModal
+        account={selectedAccount}
         onClose={() => setSelectedAccount(null)}
         onApprove={handleApprove}
         onReject={handleReject}
@@ -163,8 +163,8 @@ export default function KYCPage({ accounts }: KYCPageProps) {
                   </td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium shadow-sm ${
-                      account.accountType === 'Project Proponent' 
-                        ? 'bg-nee-100 dark:bg-nee-900/30 text-nee-800 dark:text-nee-300' 
+                      account.accountType === 'Project Proponent'
+                        ? 'bg-nee-100 dark:bg-nee-900/30 text-nee-800 dark:text-nee-300'
                         : 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
                     }`}>
                       {account.accountType}
@@ -203,13 +203,13 @@ export default function KYCPage({ accounts }: KYCPageProps) {
   );
 }
 
-function KYCDetailModal({ 
-  account, 
-  onClose, 
-  onApprove, 
-  onReject 
-}: { 
-  account: Account; 
+function KYCDetailModal({
+  account,
+  onClose,
+  onApprove,
+  onReject
+}: {
+  account: Account;
   onClose: () => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;

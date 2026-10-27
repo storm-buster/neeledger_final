@@ -1,10 +1,15 @@
 // API Configuration
-// Use relative path for Vercel deployment, fallback to localhost for dev
+// Consolidated handling for VITE_API_BASE_URL and legacy VITE_API_URL.
+// Uses relative path for production (Vercel) and fallback to localhost:4000 for local dev.
 const getBaseUrl = (): string => {
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
     return ''; // Use relative path on production (Vercel)
   }
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+  return (
+    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_URL ||
+    'http://localhost:4000'
+  );
 };
 
 export const apiConfig = {
@@ -31,14 +36,14 @@ export const apiClient = {
         url.searchParams.append(key, value);
       });
     }
-    
+
     const response = await fetch(url.toString());
     if (!response.ok) {
       throw new Error(`API Error: ${response.status} ${response.statusText}`);
     }
     return response.json();
   },
-  
+
   post: async (endpoint: string, data?: any) => {
     const baseUrl = apiConfig.baseURL;
     const fullUrl = baseUrl ? `${baseUrl}${endpoint}` : endpoint;
@@ -49,7 +54,7 @@ export const apiClient = {
       },
       body: data ? JSON.stringify(data) : undefined,
     });
-    
+
     if (!response.ok) {
       throw new Error(`API Error: ${response.status} ${response.statusText}`);
     }

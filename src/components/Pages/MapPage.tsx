@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, Suspense, lazy } from 'react';
 import { useDocumentActions } from '../../hooks/useDocumentActions';
 import satsData from '../../data/customerSatellites.json';
-import { SupabaseService } from '../../lib/supabaseService';
+import { projectsApi } from '../../api';
 
 type Item = {
   id: string;
@@ -26,23 +26,26 @@ export default function MapPage() {
 
   useEffect(() => {
     const load = async () => {
-      // Load projects from Supabase
+      // Load projects via centralized projectsApi
       try {
-        const supabaseProjects = await SupabaseService.getProjects();
-        const mappedProjects = supabaseProjects.map(p => {
-          // Parse coordinates from string "lat,lng" format
+        const loadedProjects = await projectsApi.getProjects();
+        const mappedProjects = loadedProjects.map(p => {
           let coords = { lat: 20.5937, lng: 78.9629 }; // Default India center
-          if (p.coordinates) {
+          if (p.metadata?.coordinates?.lat && p.metadata?.coordinates?.lng) {
+            coords = { lat: Number(p.metadata.coordinates.lat), lng: Number(p.metadata.coordinates.lng) };
+          } else if (typeof p.coordinates === 'object' && p.coordinates?.lat && p.coordinates?.lng) {
+            coords = { lat: Number(p.coordinates.lat), lng: Number(p.coordinates.lng) };
+          } else if (typeof p.coordinates === 'string') {
             const parts = p.coordinates.split(',');
             if (parts.length === 2) {
               coords = { lat: parseFloat(parts[0]), lng: parseFloat(parts[1]) };
             }
           } else if (p.latitude && p.longitude) {
-            coords = { lat: p.latitude, lng: p.longitude };
+            coords = { lat: Number(p.latitude), lng: Number(p.longitude) };
           }
           return {
             id: p.id,
-            name: p.name,
+            name: p.name || p.metadata?.ownership || p.id,
             coordinates: coords,
             country: p.country || p.state_name || 'India'
           };
@@ -285,4 +288,3 @@ function loadMarkerCluster(): Promise<void> {
     document.body.appendChild(script);
   });
 }
-
