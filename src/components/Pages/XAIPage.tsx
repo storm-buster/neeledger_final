@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Upload, Brain, FileText, CheckCircle, XCircle, TrendingUp, BarChart3, Sparkles, AlertTriangle, Layers } from 'lucide-react';
 import { XAIResult, XAIResponse } from '../../types';
 import { geminiService, GeminiAnalysisResult } from '../../lib/geminiService';
+import { aiApi } from '../../api';
 import GradCAMVisualization from '../Common/GradCAMVisualization';
 
 // Grad-CAM analysis metrics type
@@ -41,43 +42,30 @@ export default function XAIPage() {
 
   const processWithAI = async () => {
     if (!uploadedFile) return;
-    
+
     setIsProcessing(true);
-    
+
     try {
       // Stage 1: Get XAI model prediction
       setProcessingStage('xai');
-      const apiEndpoint = import.meta.env.PROD ? '/api/predict-biomass' : 'http://localhost:8001/predict-biomass';
-      const response = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          B2: 0.05,
-          B3: 0.06,
-          B4: 0.04,
-          B8: 0.3,
-          species: 'Mangrove'
-        })
+      const data = await aiApi.predictBiomass({
+        B2: 0.05,
+        B3: 0.06,
+        B4: 0.04,
+        B8: 0.3,
+        species: 'Mangrove'
       });
 
-      if (!response.ok) {
-        throw new Error('API request failed');
-      }
-
-      const data = await response.json();
-      
       // Stage 2: Generate Grad-CAM analysis (simulated for now)
       setProcessingStage('gradcam');
       await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate Grad-CAM processing
-      
+
       // Generate Grad-CAM metrics based on model confidence and feature importance
       const ndviImportance = data.feature_importance?.ndvi || data.feature_importance?.NDVI || 30;
       const vegetationFocus = Math.min(95, 65 + (ndviImportance * 0.5) + (Math.random() * 10));
       const waterFocus = Math.max(2, 15 - (ndviImportance * 0.2) + (Math.random() * 5));
       const otherFocus = 100 - vegetationFocus - waterFocus;
-      
+
       const gradcamMetrics: GradCAMMetrics = {
         alignmentScore: Math.min(0.95, 0.6 + (data.confidence / 100) * 0.3 + (Math.random() * 0.1)),
         vegetationFocus: Math.round(vegetationFocus * 10) / 10,
@@ -85,7 +73,7 @@ export default function XAIPage() {
         otherFocus: Math.round(otherFocus * 10) / 10,
         spatialCoherence: Math.min(0.98, 0.7 + (data.confidence / 100) * 0.2 + (Math.random() * 0.08))
       };
-      
+
       setGradCAMMetrics(gradcamMetrics);
       setShowGradCAM(true);
 
@@ -98,9 +86,9 @@ export default function XAIPage() {
           EVI: Math.round(data.feature_importance.EVI || data.feature_importance.evi || 0),
           SAVI: Math.round(data.feature_importance.SAVI || 0),
           'Spectral Bands': Math.round(
-            (data.feature_importance.B2 || 0) + 
-            (data.feature_importance.B3 || 0) + 
-            (data.feature_importance.B4 || 0) + 
+            (data.feature_importance.B2 || 0) +
+            (data.feature_importance.B3 || 0) +
+            (data.feature_importance.B4 || 0) +
             (data.feature_importance.B8 || 0)
           )
         }
@@ -141,7 +129,7 @@ export default function XAIPage() {
           // Continue with XAI result only
         }
       }
-      
+
       setXAIResult(finalResult);
       setProcessingStage(null);
     } catch (error) {
@@ -203,7 +191,7 @@ export default function XAIPage() {
               <Upload className="w-5 h-5 mr-2 text-blue-500 dark:text-blue-400" />
               Upload Monitoring Report
             </h3>
-            
+
             <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center hover:border-blue-400 dark:hover:border-blue-500 transition-colors bg-white/60 dark:bg-gray-800/50">
               <input
                 type="file"
@@ -247,7 +235,7 @@ export default function XAIPage() {
                   </div>
                   <span className="text-sm text-blue-600 dark:text-blue-400">{(uploadedFile.size / 1024 / 1024).toFixed(2)} MB</span>
                 </div>
-                
+
                 <button
                   onClick={processWithAI}
                   disabled={isProcessing}
@@ -364,7 +352,7 @@ export default function XAIPage() {
                     <Sparkles className="w-4 h-4 ml-2 text-yellow-500" />
                   )}
                 </h3>
-                
+
                 <div className="grid grid-cols-2 gap-4 mb-6">
                   <div className="bg-blue-50 rounded-lg p-4">
                     <h4 className="font-medium text-blue-800 mb-2">Claimed Carbon Removed</h4>
@@ -394,7 +382,7 @@ export default function XAIPage() {
                       </span>
                   </div>
                   <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                    <div 
+                    <div
                       className={`h-3 rounded-full ${
                         xaiResult.confidence >= confidenceThreshold ? 'bg-green-500 dark:bg-green-600' : 'bg-red-500 dark:bg-red-600'
                       }`}
@@ -421,7 +409,7 @@ export default function XAIPage() {
                           <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{importance}%</span>
                         </div>
                             <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                              <div 
+                              <div
                                 className="bg-nee-500 dark:bg-nee-600 h-2 rounded-full"
                                 style={{ width: `${importance}%` }}
                               ></div>
@@ -439,7 +427,7 @@ export default function XAIPage() {
                     <Sparkles className="w-5 h-5 mr-2 text-yellow-500 dark:text-yellow-400" />
                     Gemini AI Insights
                   </h3>
-                  
+
                   <div className="space-y-4">
                     <div>
                       <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-2">Analysis Summary</h4>
@@ -504,16 +492,16 @@ export default function XAIPage() {
               {/* Decision Panel */}
               <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">Decision Panel</h3>
-                
+
                   <div className={`p-4 rounded-lg mb-4 ${
-                  xaiResult.confidence >= confidenceThreshold 
-                    ? 'bg-nee-50 border border-nee-100' 
+                  xaiResult.confidence >= confidenceThreshold
+                    ? 'bg-nee-50 border border-nee-100'
                     : 'bg-red-50 border border-red-200'
                 }`}>
                   <p className={`font-medium ${
                     xaiResult.confidence >= confidenceThreshold ? 'text-nee-800' : 'text-red-800'
                   }`}>
-                    {xaiResult.confidence >= confidenceThreshold 
+                    {xaiResult.confidence >= confidenceThreshold
                       ? '✅ Confidence above threshold - Recommended for ACVA verification'
                       : '❌ Confidence below threshold - Recommend resubmission'
                     }
@@ -544,7 +532,7 @@ export default function XAIPage() {
                     decision === 'approve' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
                   }`}>
                     <p className={`font-medium ${decision === 'approve' ? 'text-green-800' : 'text-red-800'}`}>
-                      {decision === 'approve' 
+                      {decision === 'approve'
                         ? '✅ Report approved and assigned to ACVA for physical verification'
                         : '❌ Report rejected - User must resubmit corrected monitoring report'
                       }

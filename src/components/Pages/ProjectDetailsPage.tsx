@@ -6,7 +6,7 @@ import ProjectMap from '../Common/ProjectMap';
 import { Project, ACVA } from '../../types';
 import { useDocumentActions } from '../../hooks/useDocumentActions';
 import { formatDocumentAsHtml } from '../../lib/documentHelpers';
-import { supabase } from '../../lib/supabase';
+import { projectsApi } from '../../api';
 
 interface ProjectDetailsPageProps {
   project?: Project | any;
@@ -33,8 +33,7 @@ export default function ProjectDetailsPage({ project: propProject, onBack, acvas
     if (!propProject && projectId) {
       const fetchProject = async () => {
         try {
-          const { data, error } = await supabase.from('projects').select('*').eq('id', projectId).single();
-          if (error) throw error;
+          const data = await projectsApi.getProjectById(projectId);
           setProject(data);
         } catch (err) { console.error('Error fetching project:', err); }
         finally { setLoading(false); }
@@ -404,7 +403,7 @@ function buildRealTimeline(
   uploadedDocs.forEach(doc => {
     const isUrl = doc.startsWith('http://') || doc.startsWith('https://');
     const fileName = isUrl ? doc.split('/').pop() || 'Document' : doc;
-    const publicUrl = isUrl ? doc : supabase.storage.from('project-documents').getPublicUrl(doc).data.publicUrl;
+    const publicUrl = projectsApi.getProjectDocumentPublicUrl(doc);
     registrationDocs.push({
       name: fileName,
       source: 'Uploaded by Project Proponent',

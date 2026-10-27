@@ -1,0 +1,45 @@
+import React, { ReactNode } from 'react';
+import AdminNavbar from './AdminNavbar';
+import ColorBends from '../ui-bits/ColorBends';
+import Footer from './Footer';
+import DemoBanner from '../Common/DemoBanner';
+import { useAuth } from '@/contexts/AuthContext';
+
+interface AdminLayoutProps {
+  children: ReactNode;
+  activeSection?: string;
+  onSectionChange?: (s: string) => void;
+}
+
+export default function AdminLayout({ children, activeSection = 'kyc', onSectionChange }: AdminLayoutProps) {
+  const { isDemoMode } = useAuth();
+  const canUseWebGL = typeof window !== 'undefined' && (() => {
+    try {
+      const canvas = document.createElement('canvas');
+      return !!(canvas.getContext && (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+    } catch (e) {
+      return false;
+    }
+  })();
+
+  return (
+    <div className="min-h-screen relative overflow-x-hidden">
+      <DemoBanner />
+      {canUseWebGL ? (
+        <ColorBends colors={["#7c3aed", "#4f46e5", "#9333ea"]} />
+      ) : (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: '100vh', pointerEvents: 'none', zIndex: 0, background: 'linear-gradient(90deg,#120b22,#0d1117)' }} />
+      )}
+
+      <AdminNavbar activeSection={activeSection} onSectionChange={onSectionChange} />
+
+      <main className={`${isDemoMode ? 'pt-28 sm:pt-32' : 'pt-24'} relative z-10 transition-all duration-200`}>
+        {children}
+      </main>
+
+      <div className="relative z-10 px-4 sm:px-6 lg:px-8">
+        <Footer />
+      </div>
+    </div>
+  );
+}
