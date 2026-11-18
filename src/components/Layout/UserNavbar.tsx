@@ -95,7 +95,7 @@ export default function UserNavbar({ activeSection, onSectionChange }: UserNavba
   const roleLabel = profile?.role || 'Project Proponent';
 
   return (
-    <nav aria-label="User navigation" className={`fixed ${isDemoMode ? 'top-8 sm:top-9' : 'top-0'} left-0 right-0 z-40 bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-white/20 dark:border-gray-700/50 shadow-lg transition-all overflow-visible`}>
+    <nav aria-label="User navigation" className="fixed top-0 left-0 right-0 z-40 bg-white/70 dark:bg-gray-900/70 backdrop-blur-xl border-b border-white/20 dark:border-gray-700/50 shadow-lg transition-all overflow-visible">
       <div className="max-w-[1400px] mx-auto w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20">
 

@@ -90,7 +90,7 @@ export default function AdminNavbar({ activeSection, onSectionChange }: AdminNav
   const displayEmail = profile?.email || user?.email || 'admin@neeledger.com';
 
   return (
-    <nav aria-label="Admin navigation" className={`fixed ${isDemoMode ? 'top-8 sm:top-9' : 'top-0'} left-0 right-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-purple-200/40 dark:border-purple-900/40 shadow-lg transition-all overflow-visible`}>
+    <nav aria-label="Admin navigation" className="fixed top-0 left-0 right-0 z-40 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-purple-200/40 dark:border-purple-900/40 shadow-lg transition-all overflow-visible">
       <div className="max-w-[1400px] mx-auto w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 sm:h-20">
 

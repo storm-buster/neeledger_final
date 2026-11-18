@@ -5,6 +5,6 @@ server/venv/
 __pycache__/
 *.pyc
 .env
-node_modules/git add .
-git commit -m "remove venv and large files"
-front
+.env*.local
+.env.local
+

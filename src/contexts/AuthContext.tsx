@@ -2,14 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { UserProfile, AuthorizationRole, BusinessAccountType } from '../types'
-import {
-  isDemoModeAllowed,
-  getStoredDemoPersona,
-  setStoredDemoPersona,
-  DEMO_USER_PROFILE,
-  DEMO_ADMIN_PROFILE,
-  DemoPersona
-} from '../config/demo'
+import { DemoPersona } from '../config/demo'
 
 export interface AuthSignInResult {
   user: User
@@ -40,33 +33,89 @@ export interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 /**
- * Normalizes Supabase, HTTP, and network errors into clear, user-friendly messages.
+ * Normalizes Supabase, HTTP, and network errors into clear, actionable messages.
  */
 export function formatAuthError(error: any): string {
   if (!error) return 'An unexpected authentication error occurred.'
   const message = error.message || error.error_description || String(error)
   const lower = message.toLowerCase()
+  const status = error.status || error.statusCode
 
-  if (lower.includes('invalid login credentials') || lower.includes('invalid_grant')) {
+  // 1. Check physical device internet connectivity
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return 'No internet connection detected on your device. Please reconnect to the internet and try again.'
+  }
+
+  // 2. Specific HTTP Status Codes
+  if (status === 401 || lower.includes('invalid api key') || lower.includes('apikey')) {
+    return 'Supabase authentication failed (HTTP 401: Invalid API Key). Please verify that VITE_SUPABASE_ANON_KEY in your environment configuration is correct.'
+  }
+
+  if (status === 404) {
+    return 'Supabase authentication endpoint not found (HTTP 404). Please verify that VITE_SUPABASE_URL points to a valid Supabase project.'
+  }
+
+  // 3. DNS and host resolution failure (e.g. project paused, domain nonexistent)
+  if (
+    lower.includes('enotfound') ||
+    lower.includes('err_name_not_resolved') ||
+    lower.includes('name_error')
+  ) {
+    return 'Unable to reach the Supabase authentication server (DNS resolution failed). The project may be paused in your Supabase dashboard or the project URL in .env.local is unreachable. Please verify your Supabase project status.'
+  }
+
+  // 4. Supabase Auth specific error codes and messages
+  if (
+    lower.includes('invalid login credentials') ||
+    lower.includes('invalid_grant') ||
+    lower.includes('invalid_credentials') ||
+    lower.includes('user not found')
+  ) {
     return 'Invalid email or password. Please verify your credentials and try again.'
   }
+
   if (
-    lower.includes('network') ||
-    lower.includes('failed to fetch') ||
-    lower.includes('enotfound') ||
-    lower.includes('econnrefused')
+    lower.includes('email not confirmed') ||
+    lower.includes('email address not confirmed')
   ) {
-    return 'Unable to reach the authentication service. Please check your internet connection and try again.'
+    return 'Please confirm your email address via the verification link sent to your inbox before signing in.'
   }
-  if (lower.includes('email not confirmed')) {
-    return 'Please confirm your email address before signing in.'
+
+  if (
+    lower.includes('jwt expired') ||
+    lower.includes('token is expired') ||
+    lower.includes('session expired') ||
+    lower.includes('invalid refresh token')
+  ) {
+    return 'Your session has expired. Please sign in again.'
   }
-  if (lower.includes('user already registered') || lower.includes('already exists')) {
+
+  if (
+    lower.includes('user already registered') ||
+    lower.includes('already exists') ||
+    lower.includes('user_already_exists')
+  ) {
     return 'An account with this email address already exists. Please sign in instead.'
   }
-  if (lower.includes('password should be at least')) {
+
+  if (
+    lower.includes('password should be at least') ||
+    lower.includes('weak_password')
+  ) {
     return 'Password must be at least 6 characters long.'
   }
+
+  // 5. Network / fetch failures when internet connection is active
+  if (
+    lower.includes('fetch failed') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('networkrequestfailed') ||
+    lower.includes('econnrefused') ||
+    lower.includes('timeout')
+  ) {
+    return 'Network request to Supabase failed. Please check that your Supabase project is active (not paused) and that VITE_SUPABASE_URL is reachable.'
+  }
+
   return message
 }
 
@@ -76,51 +125,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true)
   const [profileLoading, setProfileLoading] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
-  const [demoPersona, setDemoPersona] = useState<DemoPersona | null>(() => getStoredDemoPersona())
-  const isDemoMode = Boolean(demoPersona && isDemoModeAllowed())
 
-  /**
-   * Activates local demo preview mode for presentations/evaluations.
-   * Completely bypasses Supabase auth without real credentials or database writes.
-   */
-  const enterDemoMode = useCallback((persona: DemoPersona) => {
-    if (!isDemoModeAllowed()) {
-      console.warn('[AuthContext] Demo mode is disabled in production.')
-      return
-    }
-    setStoredDemoPersona(persona)
-    setDemoPersona(persona)
-    const demoProfile = persona === 'admin' ? DEMO_ADMIN_PROFILE : DEMO_USER_PROFILE
-    setProfile(demoProfile)
-    setUser({
-      id: demoProfile.id,
-      email: demoProfile.email,
-      app_metadata: {},
-      user_metadata: { name: demoProfile.name, is_demo: true },
-      aud: 'authenticated',
-      created_at: demoProfile.member_since || new Date().toISOString()
-    } as User)
-    setAuthError(null)
-    setLoading(false)
-    setProfileLoading(false)
+  // Demo mode is explicitly disabled in favor of real Supabase authentication
+  const isDemoMode = false
+  const demoPersona: DemoPersona | null = null
+
+  const enterDemoMode = useCallback((_persona: DemoPersona) => {
+    console.warn('[AuthContext] Demo mode is disabled. Real Supabase authentication is active.')
   }, [])
 
-  /**
-   * Exits demo preview mode and clears local persona from session storage.
-   */
   const exitDemoMode = useCallback(() => {
-    setStoredDemoPersona(null)
-    setDemoPersona(null)
-    setUser(null)
-    setProfile(null)
-    setAuthError(null)
+    // Inert callback retained for API compatibility
   }, [])
 
   /**
    * Fetches user profile from public.users table.
    * This is the trusted source for the is_admin authorization flag.
+   * If record is not found, safely provides an unprivileged fallback profile.
    */
-  const fetchProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
+  const fetchProfile = useCallback(async (userId: string, currentUser?: User | null): Promise<UserProfile | null> => {
     try {
       const { data, error } = await supabase
         .from('users')
@@ -130,15 +153,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) {
         console.warn('[AuthContext] Unable to read profile from public.users:', error.message)
-        return null
       }
 
-      if (!data) {
-        console.warn(`[AuthContext] No public.users record for ${userId}. Defaulting to standard user permissions.`)
-        return null
+      if (data) {
+        return data as UserProfile
       }
 
-      return data as UserProfile
+      // If record is missing in public.users, attempt client-side creation for authenticated user
+      if (currentUser && currentUser.id === userId) {
+        const fallbackName = currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || 'User'
+        const fallbackRole = (currentUser.user_metadata?.account_type as BusinessAccountType) || 'Project Developer'
+
+        const { data: created, error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: userId,
+            name: fallbackName,
+            email: currentUser.email || '',
+            role: fallbackRole,
+            is_admin: false,
+            is_disabled: false,
+            credits: 1000.0,
+            member_since: new Date().toISOString(),
+            additional_data: {}
+          })
+          .select('*')
+          .maybeSingle()
+
+        if (!insertError && created) {
+          return created as UserProfile
+        }
+
+        // Safe in-memory fallback: strictly standard user (is_admin = false)
+        return {
+          id: userId,
+          email: currentUser.email || '',
+          name: fallbackName,
+          role: fallbackRole,
+          is_admin: false,
+          is_disabled: false,
+          credits: 0,
+          kyc_status: 'Pending',
+          member_since: currentUser.created_at || new Date().toISOString(),
+          additional_data: {}
+        }
+      }
+
+      return null
     } catch (err) {
       console.error('[AuthContext] Unexpected error querying public.users:', err)
       return null
@@ -149,25 +210,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let isMounted = true
 
     const initializeAuth = async () => {
-      // If demo mode is active from stored session, restore mock session immediately
-      if (isDemoModeAllowed()) {
-        const stored = getStoredDemoPersona()
-        if (stored) {
-          enterDemoMode(stored)
-          return
-        }
-      }
-
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         if (!isMounted) return
+
+        if (sessionError) {
+          console.warn('[AuthContext] Session retrieval error:', sessionError.message)
+        }
 
         const currentUser = session?.user ?? null
         setUser(currentUser)
 
         if (currentUser) {
           setProfileLoading(true)
-          const userProfile = await fetchProfile(currentUser.id)
+          const userProfile = await fetchProfile(currentUser.id, currentUser)
           if (isMounted) {
             if (userProfile?.is_disabled) {
               await supabase.auth.signOut()
@@ -193,17 +249,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initializeAuth()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return
-      // If in demo mode, ignore remote auth events
-      if (getStoredDemoPersona() && isDemoModeAllowed()) return
+
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+        setProfile(null)
+        setLoading(false)
+        setProfileLoading(false)
+        return
+      }
 
       const currentUser = session?.user ?? null
       setUser(currentUser)
 
       if (currentUser) {
         setProfileLoading(true)
-        const userProfile = await fetchProfile(currentUser.id)
+        const userProfile = await fetchProfile(currentUser.id, currentUser)
         if (isMounted) {
           if (userProfile?.is_disabled) {
             await supabase.auth.signOut()
@@ -232,7 +294,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshProfile = useCallback(async (): Promise<UserProfile | null> => {
     if (!user) return null
     setProfileLoading(true)
-    const userProfile = await fetchProfile(user.id)
+    const userProfile = await fetchProfile(user.id, user)
     setProfile(userProfile)
     setProfileLoading(false)
     return userProfile
@@ -251,13 +313,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthError(null)
     try {
       // 1. Register with Supabase Auth
-      // Business account type stored for profile display only, NEVER for admin authorization
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: email.trim(),
         password,
         options: {
           data: {
-            name,
+            name: name.trim(),
             account_type: role
           }
         }
@@ -265,18 +326,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (error) throw error
 
-      // 2. Persist to public.users table
-      // CRITICAL SECURITY RULE: is_admin is explicitly hardcoded to false on signup.
-      // Admin privilege can never be granted by the client through signup parameters.
+      // 2. Persist to public.users table (is_admin = false enforced)
       if (data.user) {
         const { error: profileError } = await supabase
           .from('users')
           .insert({
             id: data.user.id,
-            name,
-            email,
-            role, // Business account type
-            is_admin: false, // Non-escalatable server column
+            name: name.trim(),
+            email: email.trim(),
+            role,
+            is_admin: false,
             is_disabled: false,
             credits: 1000.0,
             member_since: new Date().toISOString(),
@@ -287,12 +346,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.warn('[AuthContext] Note on user profile creation:', profileError.message)
         }
 
-        const userProfile = await fetchProfile(data.user.id)
-        setProfile(userProfile)
+        if (data.session) {
+          const userProfile = await fetchProfile(data.user.id, data.user)
+          setProfile(userProfile)
+          setUser(data.user)
+        }
       }
 
       return data
     } catch (err: any) {
+      if (import.meta.env.DEV) {
+        console.error('[AuthContext] Registration network/service error:', {
+          name: err?.name,
+          message: err?.message,
+          status: err?.status,
+          code: err?.code,
+          cause: err?.cause?.message || err?.cause
+        })
+      }
       const friendly = formatAuthError(err)
       setAuthError(friendly)
       throw new Error(friendly)
@@ -303,7 +374,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setAuthError(null)
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password
       })
 
@@ -311,7 +382,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!data.user) throw new Error('Sign in succeeded but user object was not returned.')
 
       // Fetch trusted profile from database
-      const userProfile = await fetchProfile(data.user.id)
+      const userProfile = await fetchProfile(data.user.id, data.user)
 
       // Check disabled state
       if (userProfile?.is_disabled) {
@@ -337,6 +408,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: authRole
       }
     } catch (err: any) {
+      if (import.meta.env.DEV) {
+        console.error('[AuthContext] Sign in network/service error:', {
+          name: err?.name,
+          message: err?.message,
+          status: err?.status,
+          code: err?.code,
+          cause: err?.cause?.message || err?.cause
+        })
+      }
       const friendly = formatAuthError(err)
       setAuthError(friendly)
       throw new Error(friendly)
@@ -345,14 +425,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     setAuthError(null)
-    if (isDemoMode) {
-      exitDemoMode()
-      return
+    try {
+      await supabase.auth.signOut()
+    } catch (err) {
+      console.warn('[AuthContext] Error during Supabase signOut:', err)
+    } finally {
+      setUser(null)
+      setProfile(null)
     }
-    const { error } = await supabase.auth.signOut()
-    setUser(null)
-    setProfile(null)
-    if (error) throw error
   }
 
   // Trusted authorization signals
@@ -392,3 +472,4 @@ export const useAuth = () => {
   }
   return context
 }
+

@@ -8,19 +8,7 @@ import { UserProfile } from '../types';
  * 2. In local development (import.meta.env.DEV), controlled via explicit environment setting
  *    (VITE_ENABLE_DEMO_MODE) with default-enabled dev support for local presentations.
  */
-export const isDemoModeAllowed = (): boolean => {
-  // Prevent demo mode from ever activating in production builds
-  if (import.meta.env.PROD) {
-    return false;
-  }
-
-  // Explicit environment toggle in local development
-  if (import.meta.env.VITE_ENABLE_DEMO_MODE !== undefined) {
-    return import.meta.env.VITE_ENABLE_DEMO_MODE === 'true' || import.meta.env.VITE_ENABLE_DEMO_MODE === '1';
-  }
-
-  return Boolean(import.meta.env.DEV);
-};
+export const isDemoModeAllowed = (): boolean => false;
 
 const STORAGE_KEY = 'neeledger_demo_persona';
 

@@ -1,20 +1,27 @@
 const express = require('express');
 const fetch = require('node-fetch');
 const cors = require('cors');
+const { localSupabaseRouter } = require('./local_supabase');
 
 const app = express();
 
-// CORS configuration for production
+// CORS configuration supporting Vite dev server ports (5173, 5174, 5175, etc.)
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL || 'https://your-app.vercel.app']
-    : ['http://localhost:5173', 'http://localhost:3000'],
+  origin: (origin, callback) => {
+    if (!origin || /^http:\/\/localhost:\d+$/.test(origin) || process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
   credentials: true,
   optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
 app.use(express.json());
+
+// Mount local Supabase Auth & PostgREST endpoints
+app.use(localSupabaseRouter);
 
 // Simple geocode proxy to OpenStreetMap Nominatim
 app.get('/api/geocode', async (req, res) => {
