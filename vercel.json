@@ -4,6 +4,10 @@
   "framework": "vite",
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" },
-    { "source": "/((?!api|assets).*)", "destination": "/index.html" }
+    { "source": "/auth/v1/:path*", "destination": "/api/supabase?_subpath=auth/v1/:path*" },
+    { "source": "/auth/v1", "destination": "/api/supabase?_subpath=auth/v1" },
+    { "source": "/rest/v1/:path*", "destination": "/api/supabase?_subpath=rest/v1/:path*" },
+    { "source": "/rest/v1", "destination": "/api/supabase?_subpath=rest/v1" },
+    { "source": "/((?!api|auth|rest|assets).*)", "destination": "/index.html" }
   ]
 }

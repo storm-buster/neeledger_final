@@ -16,6 +16,14 @@ export default defineConfig({
         target: 'http://localhost:4000',
         changeOrigin: true,
       },
+      '/auth/v1': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
+      '/rest/v1': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
     },
   },
 })
