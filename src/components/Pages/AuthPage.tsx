@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { BusinessAccountType } from '../../types';
-import { Eye, EyeOff, Mail, Lock, User, Briefcase, AlertCircle, CheckCircle2, Shield, Sparkles } from 'lucide-react';
-import { isDemoModeAllowed } from '../../config/demo';
+import { Eye, EyeOff, Mail, Lock, User, Briefcase, AlertCircle, CheckCircle2 } from 'lucide-react';
 
 interface AuthPageProps {
   mode?: 'login' | 'signup';
@@ -21,64 +20,116 @@ export default function AuthPage({ mode = 'login' }: AuthPageProps) {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  const { signUp, signIn, clearAuthError, enterDemoMode } = useAuth();
+  const { user, isAdmin, loading: authLoading, signUp, signIn, clearAuthError } = useAuth();
   const navigate = useNavigate();
-  const demoAllowed = isDemoModeAllowed();
+  const location = useLocation();
 
-  const handleDemoSelect = (persona: 'user' | 'admin') => {
-    enterDemoMode(persona);
-    setRedirecting(true);
-    if (persona === 'admin') {
-      setSuccessMessage('Entering Demo Admin Portal (MRV Auditor view)...');
-      setTimeout(() => navigate('/admin'), 300);
-    } else {
-      setSuccessMessage('Entering Demo User Portal (Project Proponent view)...');
-      setTimeout(() => navigate('/'), 300);
+  // If the user already has an active session, redirect them to the appropriate portal
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (isAdmin) {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     }
-  };
+  }, [user, isAdmin, authLoading, navigate]);
 
   const handleInputChange = () => {
     if (error) setError('');
     clearAuthError();
   };
 
+  const validateForm = (): boolean => {
+    const trimmedEmail = email.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!trimmedEmail) {
+      setError('Please enter your email address.');
+      return false;
+    }
+    if (!emailRegex.test(trimmedEmail)) {
+      setError('Please enter a valid email address (e.g. user@example.com).');
+      return false;
+    }
+    if (!password) {
+      setError('Please enter your password.');
+      return false;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return false;
+    }
+    if (!isLogin && !name.trim()) {
+      setError('Please enter your full name.');
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    if (loading || redirecting) return;
+
     setError('');
     setSuccessMessage('');
 
+    if (!validateForm()) return;
+
+    setLoading(true);
+
     try {
       if (isLogin) {
-        // Authenticate and obtain trusted role from public.users
-        const result = await signIn(email, password);
+        // Authenticate via Supabase signInWithPassword
+        const result = await signIn(email.trim(), password);
         setRedirecting(true);
 
-        // Role-based redirection:
-        // Trusted admin -> /admin
-        // Standard user -> /
+        const from = (location.state as any)?.from;
+        const requestedPath = from?.pathname;
+
         if (result.isAdmin) {
-          setSuccessMessage('Admin credentials verified. Redirecting to Admin Panel...');
+          setSuccessMessage('Administrator credentials verified. Redirecting to Admin Panel...');
+          const destination = requestedPath && !requestedPath.startsWith('/login') ? requestedPath : '/admin';
           setTimeout(() => {
-            navigate('/admin');
+            navigate(destination, { replace: true });
           }, 400);
         } else {
-          setSuccessMessage('Signed in successfully. Redirecting to User Panel...');
+          setSuccessMessage('Signed in successfully. Redirecting to User Dashboard...');
+          // Non-admin users cannot access admin-only paths
+          const isAdminRoute = requestedPath && (
+            requestedPath.startsWith('/admin') ||
+            requestedPath.startsWith('/kyc') ||
+            requestedPath.startsWith('/acva') ||
+            requestedPath.startsWith('/validation') ||
+            requestedPath.startsWith('/verification')
+          );
+          const destination = requestedPath && !isAdminRoute && !requestedPath.startsWith('/login')
+            ? requestedPath
+            : '/';
           setTimeout(() => {
-            navigate('/');
+            navigate(destination, { replace: true });
           }, 400);
         }
       } else {
-        await signUp(email, password, name, role);
+        // Register via Supabase signUp
+        const signupResult = await signUp(email.trim(), password, name.trim(), role);
         setRedirecting(true);
-        setSuccessMessage('Account created successfully! Redirecting...');
-        setTimeout(() => {
-          navigate('/');
-        }, 500);
+
+        // If email confirmation is enabled on the Supabase project, session is null
+        if (signupResult?.session) {
+          setSuccessMessage('Account created and signed in! Redirecting to Dashboard...');
+          setTimeout(() => {
+            navigate('/', { replace: true });
+          }, 500);
+        } else {
+          setSuccessMessage('Account registered! Please check your email to verify your account, then sign in.');
+          setRedirecting(false);
+          setIsLogin(true);
+        }
       }
     } catch (err: any) {
       setRedirecting(false);
-      setError(err.message || 'Authentication failed. Please verify your credentials.');
+      setError(err.message || 'Authentication failed. Please verify your credentials and try again.');
     } finally {
       setLoading(false);
     }
@@ -116,7 +167,7 @@ export default function AuthPage({ mode = 'login' }: AuthPageProps) {
 
         {/* Auth Form */}
         <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-white/20 dark:border-gray-700/50">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" noValidate>
             {/* Name field for signup */}
             {!isLogin && (
               <div>
@@ -134,8 +185,9 @@ export default function AuthPage({ mode = 'login' }: AuthPageProps) {
                       setName(e.target.value);
                       handleInputChange();
                     }}
+                    disabled={loading || redirecting}
                     required
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-nee-500 focus:border-transparent"
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-nee-500 focus:border-transparent disabled:opacity-60"
                     placeholder="Enter your full name"
                   />
                 </div>
@@ -158,9 +210,11 @@ export default function AuthPage({ mode = 'login' }: AuthPageProps) {
                     setEmail(e.target.value);
                     handleInputChange();
                   }}
+                  disabled={loading || redirecting}
                   required
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-nee-500 focus:border-transparent"
-                  placeholder="Enter your email"
+                  autoComplete="email"
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-nee-500 focus:border-transparent disabled:opacity-60"
+                  placeholder="name@example.com"
                 />
               </div>
             </div>
@@ -181,9 +235,11 @@ export default function AuthPage({ mode = 'login' }: AuthPageProps) {
                     setPassword(e.target.value);
                     handleInputChange();
                   }}
+                  disabled={loading || redirecting}
                   required
-                  className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-nee-500 focus:border-transparent"
-                  placeholder="Enter your password"
+                  autoComplete={isLogin ? 'current-password' : 'new-password'}
+                  className="w-full pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-nee-500 focus:border-transparent disabled:opacity-60"
+                  placeholder="Enter your password (min. 6 characters)"
                 />
                 <button
                   type="button"
@@ -213,7 +269,8 @@ export default function AuthPage({ mode = 'login' }: AuthPageProps) {
                   <select
                     value={role}
                     onChange={(e) => setRole(e.target.value as BusinessAccountType)}
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-nee-500 focus:border-transparent"
+                    disabled={loading || redirecting}
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white/50 dark:bg-gray-700/50 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-nee-500 focus:border-transparent disabled:opacity-60"
                   >
                     <option value="Project Developer">Project Developer</option>
                     <option value="Project Proponent">Project Proponent</option>
@@ -264,8 +321,10 @@ export default function AuthPage({ mode = 'login' }: AuthPageProps) {
             <p className="text-gray-600 dark:text-gray-400">
               {isLogin ? "Don't have an account?" : "Already have an account?"}
               <button
+                type="button"
                 onClick={toggleMode}
-                className="ml-1 text-nee-600 dark:text-nee-400 hover:text-nee-700 dark:hover:text-nee-300 font-semibold transition-colors"
+                disabled={loading || redirecting}
+                className="ml-1 text-nee-600 dark:text-nee-400 hover:text-nee-700 dark:hover:text-nee-300 font-semibold transition-colors disabled:opacity-50"
               >
                 {isLogin ? 'Sign Up' : 'Sign In'}
               </button>
@@ -281,45 +340,6 @@ export default function AuthPage({ mode = 'login' }: AuthPageProps) {
               >
                 Upload KYC Documents →
               </a>
-            </div>
-          )}
-
-          {/* Safe Local Demo Mode Options for Hackathon Preview */}
-          {demoAllowed && (
-            <div className="mt-6 pt-5 border-t border-gray-200/80 dark:border-gray-700/80">
-              <div className="text-center mb-3">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700/60">
-                  <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
-                  Presentation / Demo Preview
-                </span>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Evaluate both panels instantly with sample MRV data (Supabase connection not required).
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => handleDemoSelect('user')}
-                  disabled={loading || redirecting}
-                  className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-md hover:shadow-lg transition-all duration-150 active:scale-[0.98]"
-                  title="Explore User Panel as Project Proponent"
-                >
-                  <User className="w-4 h-4 shrink-0" />
-                  <span>Demo User Preview</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleDemoSelect('admin')}
-                  disabled={loading || redirecting}
-                  className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md hover:shadow-lg transition-all duration-150 active:scale-[0.98]"
-                  title="Explore Admin Panel as Auditor"
-                >
-                  <Shield className="w-4 h-4 shrink-0" />
-                  <span>Demo Admin Preview</span>
-                </button>
-              </div>
             </div>
           )}
         </div>

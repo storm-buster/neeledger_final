@@ -33,7 +33,7 @@ export default function AdminLayout({ children, activeSection = 'kyc', onSection
 
       <AdminNavbar activeSection={activeSection} onSectionChange={onSectionChange} />
 
-      <main className={`${isDemoMode ? 'pt-28 sm:pt-32' : 'pt-24'} relative z-10 transition-all duration-200`}>
+      <main className="pt-24 relative z-10 transition-all duration-200">
         {children}
       </main>
 
